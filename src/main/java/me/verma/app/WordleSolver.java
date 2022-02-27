@@ -3,6 +3,7 @@ package me.verma.app;
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Table;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -14,8 +15,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static me.verma.app.Utils.containsChar;
-import static me.verma.app.Utils.starters;
+import static me.verma.app.Utils.*;
 
 /**
  * A simple wordle solver
@@ -24,14 +24,22 @@ public class WordleSolver {
     public static final int WORD_LENGTH = 5;
     private static final Logger logger = Logger.getGlobal();
     private static final Table<Integer, Integer, Set<String>> wordTable = HashBasedTable.create();
-    private static Set<String> words;
+    private static List<String> words;
+    private static final Map<String, Integer> wordFrequencies = new HashMap<>();
 
     private static void getWordsFromDict() throws IOException {
         words = Files.lines(Paths.get("/usr/share/dict/words"))
                 .filter(s -> s.length() == WORD_LENGTH)
                 .map(String::toLowerCase)
-                .collect(Collectors.toSet());
+                .collect(Collectors.toList());
         logger.info("Read " + words.size() + " words...");
+
+        File file = new File("src/main/resources/movies_text.txt");
+        Scanner input = new Scanner(file);
+        while (input.hasNext()) {
+            String word  = input.next().toLowerCase(Locale.ROOT).replaceAll("[^a-zA-Z]", "");
+            if(word.length() == 5) wordFrequencies.put(word, wordFrequencies.getOrDefault(word, 0) + 1);
+        }
     }
 
     private static void tabulate() {
@@ -49,16 +57,17 @@ public class WordleSolver {
 
     private static String randomPopularWord() {
         final List<String> startWords = starters();
+        printEmphasized(startWords.size() + " words to start with!");
         final int range = startWords.size() - 1;
         final Random random = new Random();
         return startWords.get(random.nextInt(range));
     }
 
-    private static Set<String> guessBestNextWords(final String currentWord, final String hint) {
+    private static List<String> guessBestNextWords(final String currentWord, final String hint) {
 
         // utilize hint to best guess next words with score. B is still BLANK, G is GREEN, Y is YELLOW
         if (currentWord.isEmpty() || hint.isEmpty()) {
-            return Set.of(randomPopularWord().toLowerCase(Locale.ROOT));
+            return List.of(randomPopularWord().toLowerCase(Locale.ROOT));
         } else {
             Map<Character, Integer> exactMatches = new HashMap<>();
             Map<Character, Integer> approxMatches = new HashMap<>();
@@ -95,6 +104,9 @@ public class WordleSolver {
 
             logger.info("Remaining " + words.size() + " words after yellow consideration!");
         }
+        Comparator<String> comp = Comparator.comparing((String a) -> wordFrequencies.getOrDefault(a, 0));
+
+        words.sort(comp);
         return words;
     }
 
@@ -138,7 +150,7 @@ public class WordleSolver {
         try {
             getWordsFromDict();
         } catch (final Exception e) {
-            logger.log(Level.SEVERE, "failed to laod dict", e);
+            logger.log(Level.SEVERE, "Failed to load dict", e);
         }
         tabulate();
 
@@ -153,7 +165,12 @@ public class WordleSolver {
             currentInput = scanner.nextLine();
             System.out.println("Enter hint: ");
             hint = scanner.nextLine();
-            System.out.println(guessBestNextWords(currentInput.toLowerCase(), hint.toLowerCase()));
+            logger.info("Exhaustive list...");
+            printEmphasized(guessBestNextWords(currentInput.toLowerCase(), hint.toLowerCase()));
+            logger.info("high confidence...");
+            List<String> mostProbable = new ArrayList<>(words);
+            mostProbable.retainAll(starters());
+            printEmphasized(mostProbable);
         }
     }
 }
