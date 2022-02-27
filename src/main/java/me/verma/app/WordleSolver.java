@@ -129,7 +129,8 @@ public class WordleSolver {
     private static boolean approxMatchFilter(Map<Character, Integer> approxMatches, String word) {
         boolean remove = false;
         for (char c : approxMatches.keySet()) {
-            if (!containsChar(word, c) && word.indexOf(c) != approxMatches.get(c)) {
+            // TODO: this match can be optimized to ignore position matches
+            if (!containsChar(word, c)) {
                 return true;
             }
         }
